@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    overscroll-behavior: none;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply w-full py-4 px-6 bg-green-600 text-white text-lg font-semibold rounded-2xl
+           shadow-lg active:scale-[0.98] transition-transform duration-100;
+  }
+
+  .btn-secondary {
+    @apply w-full py-3 px-5 bg-white text-gray-700 text-base font-medium rounded-xl
+           border border-gray-200 shadow-sm active:scale-[0.98] transition-transform duration-100;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}

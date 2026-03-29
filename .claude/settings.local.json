@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew list:*)",
+      "Bash(export PATH=\"$HOME/local/bin:$PATH\")",
+      "Bash(npm install:*)",
+      "Bash(npx vite:*)",
+      "Bash(/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>&1)",
+      "Bash(curl:*)",
+      "Bash(gh --version)",
+      "Bash(vercel --version)",
+      "Bash(npm uninstall:*)",
+      "Bash(tar -xzf /tmp/gh.tar.gz -C /tmp)",
+      "Bash(cp /tmp/gh_2.63.2_macOS_amd64/bin/gh ~/local/bin/gh)",
+      "Bash(chmod +x ~/local/bin/gh)",
+      "Bash(~/local/bin/gh --version)",
+      "Bash(unzip -o gh.zip)"
+    ]
+  }
+}
