@@ -14,7 +14,8 @@
       "Bash(cp /tmp/gh_2.63.2_macOS_amd64/bin/gh ~/local/bin/gh)",
       "Bash(chmod +x ~/local/bin/gh)",
       "Bash(~/local/bin/gh --version)",
-      "Bash(unzip -o gh.zip)"
+      "Bash(unzip -o gh.zip)",
+      "Bash(vercel --prod)"
     ]
   }
 }
