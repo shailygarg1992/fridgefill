@@ -62,7 +62,8 @@ export default async function handler(req, res) {
     // (one Claude call per email to avoid context limits with large HTML)
     const allOrders = [];
 
-    for (const msg of allMessageIds.slice(0, 15)) {
+    // Process up to 5 emails per sync (each Claude call takes ~5-8s, 60s timeout)
+    for (const msg of allMessageIds.slice(0, 5)) {
       const msgUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`;
       const msgResponse = await fetch(msgUrl, {
         headers: { Authorization: `Bearer ${gmail_token}` },
@@ -86,7 +87,12 @@ export default async function handler(req, res) {
         html = extractBodyFromParts(msgData.payload.parts);
       }
 
-      if (!html) continue;
+      if (!html) {
+        console.log(`Email ${msg.id}: no HTML body found`);
+        continue;
+      }
+
+      console.log(`Email ${msg.id}: raw HTML length = ${html.length}, subject = "${subject}"`);
 
       // Clean HTML: remove styles/scripts/images but KEEP structural tags
       // This preserves tables, divs, spans that contain item data
@@ -104,6 +110,8 @@ export default async function handler(req, res) {
       // After stripping styles/scripts/images/attributes, 176KB → ~30-50KB
       // Claude Sonnet can handle up to ~100K tokens, so 50KB of HTML is fine
       const htmlChunk = cleanedHtml.slice(0, 50000);
+
+      console.log(`Email ${msg.id}: cleaned HTML length = ${cleanedHtml.length}, chunk sent = ${htmlChunk.length}`);
 
       // Parse this single email with Claude
       try {
@@ -142,6 +150,8 @@ ${htmlChunk}`,
           if (jsonMatch) result = JSON.parse(jsonMatch[0]);
           else continue;
         }
+
+        console.log(`Email ${msg.id}: Claude returned ${result?.items?.length || 0} items`);
 
         if (result && result.items && result.items.length > 0) {
           // If Claude didn't get the date from the email, parse it from the header

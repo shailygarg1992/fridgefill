@@ -63,12 +63,17 @@ export default function App() {
         return
       }
 
-      if (!response.ok) throw new Error('Failed to fetch orders')
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.message || errData.error || `Server error ${response.status}`)
+      }
 
       const data = await response.json()
       if (data.orders && data.orders.length > 0) {
         setOrders(data.orders)
         localStorage.setItem('parsed_orders', JSON.stringify(data.orders))
+      } else {
+        setError(`Found ${data.emails_found || 0} emails but couldn't extract items. ${data.message || ''}`)
       }
       setScreen('home')
     } catch (err) {
