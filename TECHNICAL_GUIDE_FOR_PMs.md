@@ -227,12 +227,62 @@ Live at fridgefill.vercel.app within ~30 seconds
 
 ---
 
-## 11. Cost Breakdown
+## 11. Gmail Integration (OAuth Explained)
+
+This is the most "enterprise-y" feature we built, and it's worth understanding because OAuth is used everywhere — Google, Facebook, Slack, GitHub all use the same pattern.
+
+**The problem:** We want to read your Walmart order emails from Gmail. But we can't just ask for your Gmail password — that's insecure and Google doesn't allow it. Instead, we use **OAuth 2.0**, which is an industry-standard way to say "let me access *specific* data in your account, with your permission, without knowing your password."
+
+**The dance (step by step):**
+
+```
+1. User taps "Connect Gmail"
+   → App sends user to Google's website
+
+2. Google shows: "FridgeFill wants to READ your Gmail. Allow?"
+   → User taps Allow
+   → Google creates a one-time code
+
+3. Google redirects user back to our app with that code
+   → Our server exchanges the code for an "access token"
+   → Think of the code as a claim ticket, the token as the actual key
+
+4. Our server uses the token to search Gmail
+   → Only searches for: emails from walmart.com about orders
+   → Cannot send, delete, or modify any emails (read-only scope)
+
+5. Claude reads the email text and extracts structured data
+   → Item names, quantities, prices, order dates
+   → Smarter than regex because email formats change over time
+
+6. App stores the parsed orders locally
+   → Future fridge scans use real purchase history
+```
+
+**Why "testing mode" matters:**
+
+Google requires apps that access user data to go through a **verification process** (security review). Until verified, the app is in "testing mode" and only pre-approved test users can use it. This is why we had to add your email under OAuth consent screen > Audience > Test users.
+
+For a personal app, testing mode is fine forever. If you wanted to let other people use FridgeFill, you'd need to submit for Google verification (~1-2 weeks review).
+
+**Security notes:**
+- The access token is stored in your browser's localStorage (on your device only)
+- The token expires after ~1 hour. Refresh tokens last longer.
+- We only request `gmail.readonly` scope — the minimum needed
+- The app never sees your Gmail password
+
+**PM takeaway:** OAuth is the right pattern whenever your app needs to access data from another service on behalf of a user. The setup is annoying (Google Cloud console, consent screen, credentials, test users) but it's a one-time cost. The user experience — one tap to connect — is clean.
+
+---
+
+## 12. Cost Breakdown
 
 | What | Cost | Why |
 |------|------|-----|
 | Vercel hosting | $0/month | Free tier — 100GB bandwidth, unlimited deploys |
-| Claude API | ~$0.50-1.00/month | ~$0.02 per scan × 2 scans/week × 4 weeks |
+| Claude API (scans) | ~$0.50-1.00/month | ~$0.02 per scan × 2 scans/week × 4 weeks |
+| Claude API (Gmail parsing) | ~$0.10/month | ~$0.01 per sync × 2 syncs/week |
+| Google Cloud | $0 | Gmail API is free for personal use |
 | Anthropic credits | $5 prepaid | Lasts ~3-6 months at current usage |
 | GitHub | $0 | Free for public repos |
 | Domain name | $0 (optional $12/year) | Using fridgefill.vercel.app for now |
@@ -242,10 +292,15 @@ Live at fridgefill.vercel.app within ~30 seconds
 
 ---
 
-## 12. Glossary of Terms Used
+## 13. Glossary of Terms Used
 
 | Term | Plain English |
 |------|--------------|
+| **OAuth 2.0** | An industry standard for letting apps access your data on another service (like Gmail) without knowing your password. |
+| **Access Token** | A temporary key that lets our app read your Gmail. Expires after ~1 hour. |
+| **Refresh Token** | A longer-lived key that lets us get a new access token without making you log in again. |
+| **Consent Screen** | The Google page that says "FridgeFill wants to read your Gmail. Allow?" |
+| **Scope** | What permissions the app is requesting. We only ask for `gmail.readonly`. |
 | **API** | A way for two programs to talk to each other. Our app talks to Claude's API to get fridge analysis. |
 | **Base64** | A way to represent binary data (like an image) as text. Needed because JSON can only contain text. |
 | **Component** | A reusable UI building block in React. Like a template for a button, card, or screen. |

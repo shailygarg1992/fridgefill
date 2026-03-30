@@ -17,6 +17,9 @@
 6. Simplified the results UI for MVP scope
 7. Fixed iOS safe area padding across all screens
 8. Fixed cart total calculation (was double-counting prices)
+9. Built Gmail OAuth integration (Phase 2) — 4 new files, 3 API routes
+10. Set up Google Cloud project with OAuth credentials and test users
+11. Added environment variables to Vercel (Google Client ID/Secret, App URL)
 
 ---
 
@@ -28,6 +31,8 @@
 - Smart filler suggestions to hit $35 free delivery
 - One-tap Walmart links for every item
 - Installable as an app on iPhone (PWA)
+- Gmail integration — auto-syncs real Walmart order history from email
+- Order History screen — view all synced orders with items and prices
 
 ---
 
@@ -49,4 +54,10 @@
 
 - **Strategic Buy alerts** (sale price detection) — removed to simplify first version
 - **Collapsible sections** (Need Now / Need Soon / Don't Forget) — replaced with a single flat list
-- All Phase 2 and 3 features remain for later
+- Predictive restock AI, recipe integration, budget dashboard remain for later
+
+## Google Cloud setup issues encountered
+
+| Issue | What user saw | Fix |
+|-------|--------------|-----|
+| 403 access_denied | "fridgefill.vercel.app has not completed the Google verification process" | App is in testing mode — need to add your email as a test user under OAuth consent screen > Audience > Test users |
