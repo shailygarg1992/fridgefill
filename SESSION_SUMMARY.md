@@ -13,8 +13,10 @@
 2. Built the entire Phase 1 MVP (17 source files)
 3. Installed Node.js (wasn't on the machine)
 4. Deployed to GitHub + Vercel
-5. Fixed 5 bugs found during real-device testing on iPhone
+5. Fixed 7 bugs found during real-device testing on iPhone
 6. Simplified the results UI for MVP scope
+7. Fixed iOS safe area padding across all screens
+8. Fixed cart total calculation (was double-counting prices)
 
 ---
 
@@ -38,6 +40,8 @@
 | Image format error | "Failed to compress image" | iPhone uses HEIC format which canvas couldn't process | `createImageBitmap` handles HEIC natively on iOS |
 | Cancel button unreachable | Button hidden under iPhone clock | No padding for iOS status bar safe area | Added top padding to push below status bar |
 | No photo upload option | Only camera capture available | Single file input with `capture` attribute | Added separate Camera and Upload buttons |
+| Done/Back buttons hidden | Results & Staples screen buttons under iPhone clock | Same safe area issue, missed on 2 screens | Added `pt-14` padding to both screen headers |
+| Cart total inflated | 3 items at $1-$3 each showing $52 total | Claude returned ambiguous `est_price` (sometimes per-unit, sometimes total), code multiplied by qty again | Renamed to `unit_price` with explicit prompt rules, added price breakdown display |
 
 ---
 

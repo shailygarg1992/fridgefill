@@ -19,9 +19,10 @@ FridgeFill Phase 1 MVP — a React PWA that lets you photograph your fridge, use
 ## Features Implemented
 1. **Home Screen** — Logo, "Scan My Fridge" CTA, last scan date
 2. **Camera Capture** — Separate Camera and Upload buttons, multi-photo support, preview/remove
-3. **Claude AI Analysis** — Sends compressed fridge photos + hardcoded order history to Claude Sonnet
+3. **Claude AI Analysis** — Sends compressed fridge photos to Vercel serverless function; purchase history lives server-side
 4. **Results Screen (simplified for MVP):**
    - Flat recommended items list (combines Need Now / Need Soon / Don't Forget)
+   - Each item shows qty x unit price breakdown for transparent math
    - Free Delivery Zone — smart filler suggestions when cart is $25-$34.99
    - Delivery progress bar ($35 threshold)
    - Toggle items on/off, cart total updates in real-time
@@ -29,6 +30,7 @@ FridgeFill Phase 1 MVP — a React PWA that lets you photograph your fridge, use
 6. **Copy list** — clipboard export
 7. **My Staples Screen** — 16 tracked items grouped by category with overdue indicators
 8. **PWA** — manifest.json, service worker, iOS meta tags, installable on iPhone
+9. **iOS safe area handling** — All screen headers sit below the status bar on all iPhone models
 
 ## Hardcoded Data
 - 5 Walmart orders (Mar 5–25, 2026) with full item details
@@ -82,6 +84,18 @@ fridgefill/
 ### 5. No way to upload existing photos
 **Problem:** Only had camera capture, no photo library access.
 **Fix:** Added separate Camera button (`capture="environment"`) and Upload button (no `capture` attribute, opens photo picker).
+
+### 6. Results & Staples screen buttons hidden under iOS status bar
+**Problem:** "Done", "Copy", and "Back" buttons on the Results and Staples screens overlapped with the iPhone clock/battery bar. Same issue we fixed on the Camera screen, but missed on these two screens.
+**Fix:** Changed header padding from `py-3` to `pt-14 pb-3` on both screens. Audited all 5 screens — Home and Analyzing are vertically centered so they were never affected.
+
+### 7. Cart total wildly inflated ($52 for 3 cheap items)
+**Problem:** Claude returned `est_price` which was ambiguous — sometimes per-unit, sometimes total for all units. Our code multiplied `est_price * qty` regardless, causing double-counting. Example: Claude returns `est_price: 7.86` (already 2 x $3.93 for milk) and `qty: 2`, so our code calculated $7.86 x 2 = $15.72 instead of $7.86.
+**Fix:**
+- Renamed field to `unit_price` in the Claude prompt with explicit rule: "unit_price must be the price for ONE unit"
+- Added reference prices directly in the prompt so Claude doesn't guess
+- Each item row now shows qty breakdown (e.g., "2 x $3.93") so user can verify the math
+- Created `getUnitPrice()` and `getLineTotal()` helper functions as single source of truth for calculations
 
 ## Environment Setup
 - Node.js v20.18.0 installed to `~/local/` (no Homebrew available)

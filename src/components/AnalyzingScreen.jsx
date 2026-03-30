@@ -11,7 +11,7 @@ const MESSAGES = [
   'Almost done...',
 ]
 
-export default function AnalyzingScreen() {
+export default function AnalyzingScreen({ message }) {
   const [msgIndex, setMsgIndex] = useState(0)
 
   useEffect(() => {
@@ -36,10 +36,14 @@ export default function AnalyzingScreen() {
         </div>
       </div>
 
-      <h2 className="text-xl font-semibold text-gray-900 mb-2">Analyzing your fridge</h2>
-      <p className="text-gray-500 text-base transition-opacity duration-300" key={msgIndex}>
-        {MESSAGES[msgIndex]}
-      </p>
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">
+        {message || 'Analyzing your fridge'}
+      </h2>
+      {!message && (
+        <p className="text-gray-500 text-base transition-opacity duration-300" key={msgIndex}>
+          {MESSAGES[msgIndex]}
+        </p>
+      )}
     </div>
   )
 }

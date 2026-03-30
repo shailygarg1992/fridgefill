@@ -171,7 +171,40 @@ Text: "Here's the purchase history... here are baseline prices...
 
 ---
 
-## 8. Deployment Pipeline
+## 8. The Price Calculation Bug (Lesson in AI Output Contracts)
+
+This is worth understanding as a PM because it shows a common pitfall when working with AI.
+
+**What happened:** We told Claude to return `est_price` and `qty` for each item. But we never defined whether `est_price` meant "price per unit" or "total price for all units." Claude interpreted it inconsistently:
+
+- Sometimes: `est_price: 3.93, qty: 2` (per-unit price) → our code calculated 3.93 x 2 = $7.86 (correct)
+- Sometimes: `est_price: 7.86, qty: 2` (total already multiplied) → our code calculated 7.86 x 2 = $15.72 (double!)
+
+With just 3 items, the cart showed $52 instead of ~$15.
+
+**How we fixed it:**
+1. Renamed the field to `unit_price` — the name itself removes ambiguity
+2. Added explicit pricing rules in the prompt: "unit_price must be the price for ONE unit"
+3. Added reference prices so Claude doesn't guess: "a2 Milk = $3.93/each"
+4. Made the math visible: each item row shows "2 x $3.93" so you can spot errors
+
+**PM lesson: When you give an AI a schema to fill in, be painfully explicit about what each field means.** Ambiguity in your "contract" with the AI causes bugs that are hard to catch because they're *sometimes* right. This applies to any AI product — always define your output contract precisely, with examples and constraints.
+
+---
+
+## 9. iOS Safe Area (Why buttons hide under the clock)
+
+iPhones have a "safe area" — the region of the screen that isn't covered by the clock, battery indicator, notch, or Dynamic Island. If you put a button at `top: 0`, it'll sit behind the status bar.
+
+**The fix is simple:** add top padding (`pt-14` in Tailwind = 56px) to any header that sticks to the top of the screen.
+
+**Why we missed it on 2 screens:** We fixed the Camera screen first, but didn't audit the other screens at the same time. This is a common pattern — fixing a bug in one place but forgetting to check all the similar places. The lesson: when you fix a category of bug (like safe area padding), grep the entire codebase for all instances.
+
+**PM takeaway:** When filing a bug like "button is behind the clock," the fix should be applied to ALL screens, not just the one screen in the screenshot. Ask the dev: "Did you check this everywhere?"
+
+---
+
+## 10. Deployment Pipeline
 
 ```
 You write code locally
@@ -194,7 +227,7 @@ Live at fridgefill.vercel.app within ~30 seconds
 
 ---
 
-## 9. Cost Breakdown
+## 11. Cost Breakdown
 
 | What | Cost | Why |
 |------|------|-----|
@@ -209,7 +242,7 @@ Live at fridgefill.vercel.app within ~30 seconds
 
 ---
 
-## 10. Glossary of Terms Used
+## 12. Glossary of Terms Used
 
 | Term | Plain English |
 |------|--------------|

@@ -1,11 +1,19 @@
-export async function analyzeFridge(images) {
+export async function analyzeFridge(images, gmailOrders = null) {
+  const body = {
+    images,
+    today: new Date().toISOString().split('T')[0],
+  };
+
+  // If we have real orders from Gmail, send them so the server uses
+  // real data instead of hardcoded history
+  if (gmailOrders && gmailOrders.length > 0) {
+    body.gmail_orders = gmailOrders;
+  }
+
   const response = await fetch('/api/analyze-fridge', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      images,
-      today: new Date().toISOString().split('T')[0],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

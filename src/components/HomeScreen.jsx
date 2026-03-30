@@ -1,4 +1,7 @@
-export default function HomeScreen({ onScan, onStaples, lastScanDate }) {
+export default function HomeScreen({
+  onScan, onStaples, onOrders, onConnectGmail, onDisconnectGmail, onSyncOrders,
+  gmailConnected, orderCount, lastScanDate,
+}) {
   const formatLastScan = () => {
     if (!lastScanDate) return 'Never scanned'
     const diff = Math.floor((Date.now() - new Date(lastScanDate)) / (1000 * 60 * 60 * 24))
@@ -30,7 +33,11 @@ export default function HomeScreen({ onScan, onStaples, lastScanDate }) {
       <div className="card w-full max-w-sm p-4 mb-6">
         <div className="flex justify-between items-center text-sm">
           <span className="text-gray-500">{formatLastScan()}</span>
-          <span className="text-gray-500">Orders every ~4-5 days</span>
+          <span className="text-gray-500">
+            {gmailConnected
+              ? `${orderCount} orders synced`
+              : 'Orders every ~4-5 days'}
+          </span>
         </div>
       </div>
 
@@ -43,6 +50,42 @@ export default function HomeScreen({ onScan, onStaples, lastScanDate }) {
           </svg>
           Scan My Fridge
         </button>
+
+        {/* Gmail Connection */}
+        {gmailConnected ? (
+          <div className="card p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900">Gmail Connected</p>
+                <p className="text-xs text-gray-500">{orderCount} Walmart orders found</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onSyncOrders} className="flex-1 py-2 text-sm text-green-600 font-medium bg-green-50 rounded-lg">
+                Refresh Orders
+              </button>
+              <button onClick={onOrders} className="flex-1 py-2 text-sm text-gray-600 font-medium bg-gray-50 rounded-lg">
+                View Orders
+              </button>
+            </div>
+            <button onClick={onDisconnectGmail} className="w-full mt-2 py-1.5 text-xs text-gray-400">
+              Disconnect Gmail
+            </button>
+          </div>
+        ) : (
+          <button onClick={onConnectGmail} className="btn-secondary flex items-center justify-center gap-3">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <path d="M22 6L12 13 2 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <rect x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+            Connect Gmail for Order History
+          </button>
+        )}
 
         <button onClick={onStaples} className="btn-secondary">
           My Staples

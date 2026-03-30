@@ -131,7 +131,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { images, today } = req.body;
+    const { images, today, gmail_orders } = req.body;
+
+    // Use Gmail orders if available, otherwise fall back to hardcoded history
+    const purchaseHistory = (gmail_orders && gmail_orders.length > 0)
+      ? gmail_orders
+      : PURCHASE_HISTORY;
 
     if (!images || images.length === 0) {
       return res.status(400).json({ error: 'At least one image is required' });
@@ -160,7 +165,7 @@ export default async function handler(req, res) {
       text: `Today's date: ${today}
 
 Purchase history:
-${JSON.stringify(PURCHASE_HISTORY, null, 2)}
+${JSON.stringify(purchaseHistory, null, 2)}
 
 Baseline prices:
 - a2 Milk Vitamin D Whole Milk, 59 oz: $3.93 (perishable)
