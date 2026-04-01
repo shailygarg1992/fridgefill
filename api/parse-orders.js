@@ -79,16 +79,16 @@ export default async function handler(req, res) {
       // Only process actual order confirmations
       if (!subject.includes('Thanks for your delivery order')) continue;
 
-      // Extract HTML body
+      // Extract HTML body — for large emails, Gmail may require a separate fetch
       let html = '';
       if (msgData.payload?.body?.data) {
         html = decodeBase64Url(msgData.payload.body.data);
       } else if (msgData.payload?.parts) {
-        html = extractBodyFromParts(msgData.payload.parts);
+        html = await extractBodyFromParts(msgData.payload.parts, msg.id, gmail_token);
       }
 
       if (!html) {
-        console.log(`Email ${msg.id}: no HTML body found`);
+        console.log(`Email ${msg.id}: no HTML body found. MIME structure: ${JSON.stringify(describeMime(msgData.payload))}`);
         continue;
       }
 
@@ -194,21 +194,60 @@ function decodeBase64Url(data) {
   return Buffer.from(base64, 'base64').toString('utf-8');
 }
 
-function extractBodyFromParts(parts) {
+async function extractBodyFromParts(parts, messageId, token) {
   // Prefer HTML — it contains the full item list
   for (const part of parts) {
-    if (part.mimeType === 'text/html' && part.body?.data) {
-      return decodeBase64Url(part.body.data);
+    if (part.mimeType === 'text/html') {
+      if (part.body?.data) {
+        return decodeBase64Url(part.body.data);
+      }
+      // For large emails, Gmail omits body.data and provides attachmentId instead
+      if (part.body?.attachmentId) {
+        console.log(`Email ${messageId}: HTML part has attachmentId (size=${part.body.size}), fetching separately`);
+        const attUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${part.body.attachmentId}`;
+        const attRes = await fetch(attUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (attRes.ok) {
+          const attData = await attRes.json();
+          if (attData.data) return decodeBase64Url(attData.data);
+        }
+      }
     }
     if (part.parts) {
-      const found = extractBodyFromParts(part.parts);
+      const found = await extractBodyFromParts(part.parts, messageId, token);
       if (found) return found;
     }
   }
+  // Fallback to plain text
   for (const part of parts) {
-    if (part.mimeType === 'text/plain' && part.body?.data) {
-      return decodeBase64Url(part.body.data);
+    if (part.mimeType === 'text/plain') {
+      if (part.body?.data) {
+        return decodeBase64Url(part.body.data);
+      }
+      if (part.body?.attachmentId) {
+        const attUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${part.body.attachmentId}`;
+        const attRes = await fetch(attUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (attRes.ok) {
+          const attData = await attRes.json();
+          if (attData.data) return decodeBase64Url(attData.data);
+        }
+      }
     }
   }
   return '';
+}
+
+function describeMime(payload) {
+  if (!payload) return 'empty';
+  const info = { type: payload.mimeType };
+  if (payload.body?.size > 0) info.bodySize = payload.body.size;
+  if (payload.body?.attachmentId) info.hasAttachmentId = true;
+  if (payload.body?.data) info.hasData = true;
+  if (payload.parts) {
+    info.parts = payload.parts.map(p => describeMime(p));
+  }
+  return info;
 }
