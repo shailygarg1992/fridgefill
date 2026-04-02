@@ -1,6 +1,6 @@
 # FridgeFill — Build Session Log
 
-**Date:** March 28-29, 2026
+**Date:** March 28 – April 2, 2026
 
 ---
 
@@ -120,8 +120,8 @@ fridgefill/
 2. Google asks "Allow FridgeFill to read your Gmail (read-only)?" → user approves
 3. Google redirects back to `/api/auth/callback` with a one-time code
 4. Server exchanges code for access token → redirects to app with token in URL
-5. App stores token in localStorage, immediately fetches Walmart order emails
-6. Claude parses the email text into structured order data (items, qty, price, date)
+5. App stores token in localStorage, immediately fetches Walmart "Delivered:" emails
+6. Server uses regex to parse structured email text into order data (items, qty, price, date)
 7. Parsed orders stored in localStorage for future fridge scans
 
 ### Google Cloud Setup Required
@@ -149,7 +149,10 @@ fridgefill/
 fridgefill/
 ├── api/
 │   ├── analyze-fridge.js          — Claude vision API (uses Gmail orders when available)
-│   ├── parse-orders.js            — Fetches Walmart emails from Gmail, Claude extracts order data
+│   ├── parse-orders.js            — Fetches "Delivered:" emails from Gmail, regex extracts items
+│   ├── debug-parse.js             — Diagnostic endpoint for Gmail parsing troubleshooting
+│   ├── debug-gmail.js             — Debug endpoint for Gmail search queries
+│   ├── test-gmail.js              — E2E test endpoint for Gmail integration
 │   └── auth/
 │       ├── google.js              — Starts OAuth flow (redirects to Google)
 │       └── callback.js            — Handles OAuth callback (exchanges code for token)
@@ -180,9 +183,68 @@ fridgefill/
 - Monthly budget dashboard
 - Price history charts
 
+## Gmail Order Parsing Debug Saga (March 29 – April 2, 2026)
+
+### The problem
+After building the Gmail integration, "Refresh Orders" returned zero orders every time.
+
+### The debugging journey (7 iterations)
+
+**Attempt 1: Increase HTML chunk size (15KB → 50KB)**
+- Theory: item data was being cut off
+- Result: still zero orders — the problem was elsewhere
+
+**Attempt 2: Handle Gmail `attachmentId` for large emails**
+- Theory: Gmail omits `body.data` for large MIME parts and requires a separate fetch
+- Result: discovered the data WAS inline (no attachmentId needed) — wrong theory
+
+**Attempt 3: Fix Vercel function timeout (504 errors)**
+- Theory: Anthropic SDK cold start + Claude API call exceeded 10s default
+- Fix: `export const config = { maxDuration: 60 }` (vercel.json config wasn't being applied)
+- Fix: replaced Anthropic SDK with direct `fetch` to api.anthropic.com
+- Fix: reduced from 15 emails to 1
+- Result: function finally returned a response instead of 504!
+
+**Attempt 4: Claude returns empty items `[]`**
+- Got a response: `{ "order_date": "2026-03-31", "items": [] }`
+- Claude received 50KB of cleaned HTML but found zero items
+- Need to understand what the email actually contains
+
+**Attempt 5: Built diagnostic endpoint (`api/debug-parse.js`)**
+- Step-by-step tracing: token → search → fetch → MIME → HTML extraction → content analysis
+- Discovered: cleaned text was only 1,722 chars despite 210KB HTML (mostly empty tables)
+- Found only 5 prices: $40.71, $14.27, $8.17, $33.75, $41.92 — these are order TOTALS
+- The "Thanks for your delivery order" email is an ORDER CONFIRMATION with no item details
+- It just says: "Fresh Fuji Apples, 3 l... + 8 items 👍" — a summary, not a list
+
+**Attempt 6: Search for the RIGHT email type**
+- Searched all Walmart email subjects in Gmail
+- Found "Delivered:" emails: "Delivered: Marketside Fresh Spina... +22 items"
+- These contain full item lists with names, quantities, and prices!
+
+**Attempt 7: Regex parsing of "Delivered:" emails (FINAL FIX)**
+- "Delivered:" email text is small (2KB) and structured:
+  ```
+  Marketside Fresh Spinach and Spring Mix, 11 oz $0.37/OZ Qty: 1 $0.40 from associate discount $3.98
+  ```
+- Regex parses this instantly — no Claude API call needed
+- Result: 9 orders, ~30 items, real prices, 3-second response time
+
+### Key learnings for PMs
+
+1. **Wrong data source is the most common bug in AI products.** We spent days optimizing HTML parsing when the real problem was: we were reading the wrong email. Always verify your data source contains what you think it does before building the pipeline.
+
+2. **Serverless cold starts are real.** Importing a heavy SDK (like `@anthropic-ai/sdk`) adds 3-4 seconds of cold start time. For time-constrained serverless functions, use direct HTTP calls instead.
+
+3. **Not everything needs AI.** The "Delivered:" email text is so structured that regex parsing is better than Claude: faster (0ms vs 8s), cheaper ($0 vs $0.01), and deterministic (no prompt engineering needed).
+
+4. **Build diagnostic endpoints.** The step-by-step debug endpoint (`debug-parse.js`) that reported results at each stage was what finally cracked the problem. When a pipeline has 5+ steps, you need visibility into each one.
+
+5. **`export const config` vs `vercel.json`:** For Vercel serverless function settings, in-file exports are more reliable than vercel.json `functions` config.
+
 ## Accounts & Config
 - **GitHub:** shailygarg1992-svg
 - **Vercel:** shailygarg1992-3481 (email: shailygarg1992@gmail.com)
 - **Google Cloud:** project "FridgeFill" (testing mode, shailygarg1992@gmail.com as test user)
 - **Anthropic:** $5 prepaid credits (~500 scans)
-- **Estimated cost:** ~$1-2/month (Gmail order parsing adds ~$0.01 per sync)
+- **Estimated cost:** ~$0.50-1/month (Gmail parsing is now free — no Claude API calls)

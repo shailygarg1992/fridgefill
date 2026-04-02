@@ -248,12 +248,14 @@ This is the most "enterprise-y" feature we built, and it's worth understanding b
    → Think of the code as a claim ticket, the token as the actual key
 
 4. Our server uses the token to search Gmail
-   → Only searches for: emails from walmart.com about orders
+   → Searches for: "Delivered:" emails from walmart.com
    → Cannot send, delete, or modify any emails (read-only scope)
 
-5. Claude reads the email text and extracts structured data
-   → Item names, quantities, prices, order dates
-   → Smarter than regex because email formats change over time
+5. Server extracts item data using regex parsing
+   → The "Delivered:" emails have structured text:
+     "Marketside Eggs, 18 Count $0.25/EA Qty: 1 $4.37"
+   → Regex extracts item name, quantity, and price — no AI needed
+   → Much faster and cheaper than using Claude
 
 6. App stores the parsed orders locally
    → Future fridge scans use real purchase history
@@ -281,18 +283,81 @@ For a personal app, testing mode is fine forever. If you wanted to let other peo
 |------|------|-----|
 | Vercel hosting | $0/month | Free tier — 100GB bandwidth, unlimited deploys |
 | Claude API (scans) | ~$0.50-1.00/month | ~$0.02 per scan × 2 scans/week × 4 weeks |
-| Claude API (Gmail parsing) | ~$0.10/month | ~$0.01 per sync × 2 syncs/week |
+| Claude API (Gmail parsing) | $0/month | Uses regex parsing, no AI call needed |
 | Google Cloud | $0 | Gmail API is free for personal use |
 | Anthropic credits | $5 prepaid | Lasts ~3-6 months at current usage |
 | GitHub | $0 | Free for public repos |
 | Domain name | $0 (optional $12/year) | Using fridgefill.vercel.app for now |
 | **Total** | **~$1/month** | |
 
-**PM takeaway:** This is an extremely cheap app to run for a single user. Scaling to 100 users would cost ~$20-50/month (Vercel Pro + more API calls). Scaling to 10,000 users would require architectural changes (database, auth, rate limiting).
+**PM takeaway:** Gmail parsing costs $0 because we use regex instead of AI. This is an extremely cheap app to run for a single user. Scaling to 100 users would cost ~$20-50/month (Vercel Pro + more API calls). Scaling to 10,000 users would require architectural changes (database, auth, rate limiting).
 
 ---
 
-## 13. Glossary of Terms Used
+## 13. Serverless Cold Starts (Why Gmail Parsing Kept Timing Out)
+
+This is one of the most important lessons from building FridgeFill, because it applies to any product that uses serverless functions (AWS Lambda, Vercel, Cloudflare Workers, etc.).
+
+**What is a cold start?**
+
+Serverless functions don't run on a server that's always on. When a request arrives:
+
+```
+1. Vercel spins up a new container      (~1-2 seconds)
+2. Loads your code + all dependencies   (~1-4 seconds depending on package size)
+3. Executes your function               (varies)
+4. Returns the response
+5. Container stays "warm" for ~5 min, then shuts down
+```
+
+If the total exceeds Vercel's timeout (10 seconds default), you get a 504 FUNCTION_INVOCATION_TIMEOUT.
+
+**What happened to us:**
+
+Our first Gmail parsing approach imported the Anthropic SDK (`@anthropic-ai/sdk`), a large package. The timeline looked like:
+
+| Step | Time | Running total |
+|------|------|---------------|
+| Container startup | ~1.5s | 1.5s |
+| Load Anthropic SDK | ~3s | 4.5s |
+| Gmail API calls | ~2s | 6.5s |
+| Claude API call | ~6s | 12.5s |
+| **Total** | | **12.5s > 10s limit = TIMEOUT** |
+
+**How we fixed it:**
+
+We eliminated the Claude API call entirely. The "Delivered:" email text is so structured that a simple regex parses it in milliseconds:
+
+| Step | Time | Running total |
+|------|------|---------------|
+| Container startup | ~1s | 1s |
+| Load code (no heavy SDK) | ~0.2s | 1.2s |
+| Gmail API calls | ~2s | 3.2s |
+| Regex parsing | ~0ms | 3.2s |
+| **Total** | | **3.2s — well under any limit** |
+
+**PM takeaway:** When evaluating whether to use AI for a feature, ask: "Is the data structured enough to parse without AI?" If yes, use code — it's faster, cheaper, and more reliable. Save AI for genuinely unstructured data (like analyzing a fridge photo). Our Gmail parsing went from $0.01/sync and 12+ seconds to $0/sync and 3 seconds by switching from Claude to regex.
+
+---
+
+## 14. Not Everything Needs AI (When to Use Code vs. Claude)
+
+A key product judgment: **use AI for unstructured problems, use code for structured ones.**
+
+| Task | Data type | Best approach | Why |
+|------|-----------|--------------|-----|
+| Analyze fridge photo | Unstructured (image) | Claude Vision API | Only AI can identify groceries in a photo |
+| Parse Walmart email items | Structured text ("Item Name $X.XX Qty: N") | Regex | Pattern is consistent, regex is instant and free |
+| Calculate cart total | Numbers | JavaScript math | AI would be slower and sometimes wrong |
+| Search Gmail | API call | Gmail API | Don't need AI to call an API |
+
+We originally used Claude to parse email HTML — it worked but was slow (8 seconds), expensive ($0.01/call), and caused timeouts. The "Delivered:" emails turned out to have perfectly structured text that regex handles in 0ms.
+
+**PM lesson:** Before adding AI to a feature, look at the actual data. If it follows a pattern, code is better. If it's genuinely unpredictable (images, free-form text, ambiguous formats), that's where AI shines.
+
+---
+
+## 15. Glossary of Terms Used
 
 | Term | Plain English |
 |------|--------------|
@@ -318,4 +383,8 @@ For a personal app, testing mode is fine forever. If you wanted to let other peo
 | **Service Worker** | A script that runs in the background, enabling offline caching for PWAs. |
 | **Tailwind** | A CSS framework where you style elements with utility classes like `bg-green-600`. |
 | **Vite** | A fast build tool for modern web apps. Compiles your code for production. |
+| **Cold Start** | The delay when a serverless function starts up for the first time. Loading heavy packages makes it worse. |
+| **Regex** | Regular Expression — a pattern-matching syntax for finding/extracting text. Like Ctrl+F on steroids. |
+| **504 Timeout** | Server took too long to respond. In serverless, means your function exceeded the time limit. |
+| **MIME** | The format emails use internally. An email can have multiple "parts" (text, HTML, images) nested inside each other. |
 | **Vercel** | A cloud platform for deploying web apps. Handles hosting, SSL, and serverless functions. |
