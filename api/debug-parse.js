@@ -33,115 +33,41 @@ export default async function handler(req, res) {
       return res.status(200).json(report);
     }
 
-    // STEP 2: Search for order emails
-    const searchQuery = 'from:walmart.com subject:"Thanks for your delivery order" newer_than:120d';
-    const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=10`;
-    const searchRes = await fetch(searchUrl, {
-      headers: { Authorization: `Bearer ${gmail_token}` },
-    });
-    const searchData = await searchRes.json();
-    const messageCount = searchData.messages?.length || 0;
-    step('2_search', {
-      ok: searchRes.ok,
-      query: searchQuery,
-      messages_found: messageCount,
-      estimated_total: searchData.resultSizeEstimate || 0,
-      error: searchData.error?.message || null,
-    });
-    if (messageCount === 0) {
-      return res.status(200).json(report);
+    // STEP 2: Search for ALL Walmart emails to find which types have item details
+    const queries = [
+      { label: 'All walmart emails', q: 'from:walmart.com newer_than:120d' },
+      { label: 'Receipt emails', q: 'from:walmart.com subject:receipt newer_than:120d' },
+      { label: 'Delivered emails', q: 'from:walmart.com subject:delivered newer_than:120d' },
+      { label: 'Order ready', q: 'from:walmart.com subject:"order is" newer_than:120d' },
+      { label: 'Substitution', q: 'from:walmart.com subject:substitut newer_than:120d' },
+      { label: 'Arriving', q: 'from:walmart.com subject:arriving newer_than:120d' },
+    ];
+
+    for (const { label, q } of queries) {
+      const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=5`;
+      const res2 = await fetch(url, { headers: { Authorization: `Bearer ${gmail_token}` } });
+      const data = await res2.json();
+      const count = data.messages?.length || 0;
+
+      // Get subjects of found emails
+      const subjects = [];
+      if (data.messages) {
+        for (const m of data.messages.slice(0, 5)) {
+          const mRes = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=Date`,
+            { headers: { Authorization: `Bearer ${gmail_token}` } }
+          );
+          const mData = await mRes.json();
+          const h = mData.payload?.headers || [];
+          subjects.push({
+            subject: h.find(x => x.name === 'Subject')?.value,
+            date: h.find(x => x.name === 'Date')?.value,
+          });
+        }
+      }
+
+      step(`2_search_${label}`, { query: q, found: count, subjects });
     }
-
-    // STEP 3: Fetch first email — full format
-    const msgId = searchData.messages[0].id;
-    const msgUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}?format=full`;
-    const msgRes = await fetch(msgUrl, {
-      headers: { Authorization: `Bearer ${gmail_token}` },
-    });
-    const msgData = await msgRes.json();
-
-    const headers = msgData.payload?.headers || [];
-    const subject = headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';
-    const date = headers.find(h => h.name.toLowerCase() === 'date')?.value || '';
-
-    step('3_fetch_email', {
-      ok: msgRes.ok,
-      message_id: msgId,
-      subject,
-      date,
-      passes_subject_filter: subject.includes('Thanks for your delivery order'),
-    });
-
-    // STEP 4: Analyze MIME structure in detail
-    const mimeInfo = deepMimeAnalysis(msgData.payload);
-    step('4_mime_structure', mimeInfo);
-
-    // STEP 5: Try to extract HTML body
-    let html = '';
-    let extractionMethod = 'none';
-
-    if (msgData.payload?.body?.data) {
-      html = decodeBase64Url(msgData.payload.body.data);
-      extractionMethod = 'payload.body.data (direct)';
-    } else if (msgData.payload?.parts) {
-      const partInfo = await findHtmlPart(msgData.payload.parts, msgId, gmail_token);
-      html = partInfo.html;
-      extractionMethod = partInfo.method;
-    }
-
-    step('5_html_extraction', {
-      method: extractionMethod,
-      html_length: html.length,
-      html_first_200: html.slice(0, 200),
-      has_html_tags: html.includes('<'),
-      has_table_tags: (html.match(/<table/gi) || []).length,
-      has_dollar_signs: html.includes('$'),
-      has_price_pattern: /\$\d+\.\d{2}/.test(html),
-    });
-
-    if (!html) {
-      return res.status(200).json(report);
-    }
-
-    // STEP 6: Clean HTML and report stats
-    const cleanedHtml = html
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<img[^>]*>/gi, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/\s*(style|class|id|width|height|align|valign|bgcolor|cellpadding|cellspacing|border|role|aria-\w+|data-\w+)="[^"]*"/gi, '')
-      .replace(/\s*(style|class|id|width|height|align|valign|bgcolor|cellpadding|cellspacing|border|role|aria-\w+|data-\w+)='[^']*'/gi, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // Strip ALL tags to get pure text content
-    const textContent = cleanedHtml
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&dollar;/g, '$')
-      .replace(/&#36;/g, '$')
-      .replace(/&zwnj;/g, '')
-      .replace(/&#?\w+;/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const priceMatches = textContent.match(/\$\d+\.\d{2}/g) || [];
-
-    step('6_content_analysis', {
-      raw_html_length: html.length,
-      cleaned_html_length: cleanedHtml.length,
-      text_content_length: textContent.length,
-      prices_found: priceMatches.length,
-      all_prices: priceMatches,
-      // Show multiple sections of the text to find where items are
-      text_0_to_1000: textContent.slice(0, 1000),
-      text_1000_to_2000: textContent.slice(1000, 2000),
-      text_2000_to_3000: textContent.slice(2000, 3000),
-      text_3000_to_4000: textContent.slice(3000, 4000),
-      text_4000_to_5000: textContent.slice(4000, 5000),
-      text_last_1000: textContent.slice(-1000),
-    });
 
     return res.status(200).json(report);
   } catch (error) {
