@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { auth, googleProvider } from "../lib/firebase";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, onAuthStateChanged } from "firebase/auth";
 import { sendCartRequest, watchCartRequest } from "../lib/cartService";
 
 export default function FillCartButton({ restockList }) {
   const [state, setState] = useState("idle"); // idle | signing_in | sending | waiting | in_progress | completed | failed
   const [progress, setProgress] = useState({ total: 0, added: 0, failed: 0 });
   const [items, setItems] = useState([]);
+  const [authReady, setAuthReady] = useState(false);
   const unsubRef = useRef(null);
 
   useEffect(() => {
+    const unsub = onAuthStateChanged(auth, () => setAuthReady(true));
     return () => {
+      unsub();
       if (unsubRef.current) unsubRef.current();
     };
   }, []);
@@ -19,7 +22,8 @@ export default function FillCartButton({ restockList }) {
     if (!restockList || restockList.length === 0) return;
 
     try {
-      // Sign in if needed
+      // Wait for auth to initialize, then sign in if needed
+      if (!authReady) await auth.authStateReady();
       if (!auth.currentUser) {
         setState("signing_in");
         await signInWithPopup(auth, googleProvider);
