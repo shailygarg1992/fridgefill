@@ -286,9 +286,10 @@ For a personal app, testing mode is fine forever. If you wanted to let other peo
 | Claude API (Gmail parsing) | $0/month | Uses regex parsing, no AI call needed |
 | Google Cloud | $0 | Gmail API is free for personal use |
 | Anthropic credits | $5 prepaid | Lasts ~3-6 months at current usage |
+| Firebase (Firestore + Auth) | $0/month | Free tier — 50K reads, 20K writes/day |
 | GitHub | $0 | Free for public repos |
 | Domain name | $0 (optional $12/year) | Using fridgefill.vercel.app for now |
-| **Total** | **~$1/month** | |
+| **Total** | **~$0.50/month** | |
 
 **PM takeaway:** Gmail parsing costs $0 because we use regex instead of AI. This is an extremely cheap app to run for a single user. Scaling to 100 users would cost ~$20-50/month (Vercel Pro + more API calls). Scaling to 10,000 users would require architectural changes (database, auth, rate limiting).
 
@@ -357,7 +358,60 @@ We originally used Claude to parse email HTML — it worked but was slow (8 seco
 
 ---
 
-## 15. Glossary of Terms Used
+## 15. "Fill My Walmart Cart" (Firebase + Chrome Extension)
+
+This is the most ambitious feature — it bridges the web app and the browser to automate cart filling.
+
+**The problem:** After scanning your fridge, you get a restock list. But you still have to manually search each item on walmart.com and add it to your cart. With 10+ items, that's tedious.
+
+**The solution:** One tap on "Fill My Walmart Cart" → a Chrome Extension automatically adds every item to your Walmart cart.
+
+**Why this needs two pieces (PWA + Extension):**
+
+| | PWA (fridgefill.vercel.app) | Chrome Extension |
+|---|---|---|
+| **Can do** | Show UI, call APIs, store data | Access browser tabs, modify walmart.com pages |
+| **Can't do** | Touch other websites or browser tabs | Show a full app UI |
+| **Role** | Sends the shopping list | Receives it and adds items to Walmart |
+
+They communicate through **Firebase Firestore** — a real-time cloud database that both can read/write.
+
+**How it works:**
+
+```
+1. User taps "Fill My Walmart Cart"
+   → PWA signs user in with Google (Firebase Auth)
+
+2. PWA writes to Firestore:
+   { status: "pending", items: [{name: "Milk", qty: 2}, ...] }
+
+3. Chrome Extension is listening for new requests
+   → Detects the pending request instantly
+
+4. Extension adds each item to Walmart cart:
+   → First tries Walmart's internal API (fastest)
+   → Falls back to DOM automation (clicks buttons on walmart.com)
+
+5. After each item, Extension updates Firestore:
+   { progress: { total: 10, added: 7, failed: 0 } }
+
+6. PWA shows real-time progress bar
+   → Updates live as each item is added
+```
+
+**Why Firebase?**
+
+Firebase is Google's app platform. We use two parts:
+- **Firestore** — a real-time database. When the Extension writes an update, the PWA sees it instantly (within ~100ms). No polling, no refresh needed.
+- **Auth** — Google Sign-In. Same identity in both the PWA and Extension, so each user's cart requests are private.
+
+**Security:** Firestore rules ensure users can only read/write their own cart requests. The Firebase API key in client code is normal — security comes from server-side rules, not key secrecy.
+
+**PM takeaway:** This pattern (web app → shared database → browser extension) is reusable for any product that needs to bridge a web UI with browser automation. The key insight is that web apps and extensions can't talk directly — they need a shared database as the bridge. Firebase makes this easy because of real-time listeners.
+
+---
+
+## 16. Glossary of Terms Used
 
 | Term | Plain English |
 |------|--------------|
@@ -383,7 +437,11 @@ We originally used Claude to parse email HTML — it worked but was slow (8 seco
 | **Service Worker** | A script that runs in the background, enabling offline caching for PWAs. |
 | **Tailwind** | A CSS framework where you style elements with utility classes like `bg-green-600`. |
 | **Vite** | A fast build tool for modern web apps. Compiles your code for production. |
+| **Chrome Extension** | A small program that runs inside Chrome and can interact with web pages. Ours automates adding items to Walmart's cart. |
 | **Cold Start** | The delay when a serverless function starts up for the first time. Loading heavy packages makes it worse. |
+| **DOM Automation** | Programmatically clicking buttons and filling forms on a web page, as if a human were doing it. |
+| **Firebase** | Google's app development platform. We use Firestore (database) and Auth (login). |
+| **Firestore** | A real-time NoSQL database. Changes sync instantly to all listeners — no polling needed. |
 | **Regex** | Regular Expression — a pattern-matching syntax for finding/extracting text. Like Ctrl+F on steroids. |
 | **504 Timeout** | Server took too long to respond. In serverless, means your function exceeded the time limit. |
 | **MIME** | The format emails use internally. An email can have multiple "parts" (text, HTML, images) nested inside each other. |

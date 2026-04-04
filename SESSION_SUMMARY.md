@@ -1,6 +1,6 @@
 # FridgeFill — Session Summary
 
-**Date:** March 28 – April 2, 2026
+**Date:** March 28 – April 4, 2026
 **What we built:** A working grocery restock app, from zero to deployed, across multiple sessions.
 **Live URL:** https://fridgefill.vercel.app
 **GitHub:** https://github.com/shailygarg1992/fridgefill
@@ -23,6 +23,9 @@
 12. Debugged Gmail order parsing (March 29 – April 2) — 4 days of iterative debugging
 13. Fixed: wrong email type, serverless timeout, SDK cold start, HTML extraction
 14. Final solution: regex parsing of "Delivered:" emails — no Claude API needed
+15. Built "Fill My Walmart Cart" button with Firebase Firestore + Auth integration
+16. Built companion Chrome Extension (fridgefill-extension/) to automate Walmart cart filling
+17. Changed GitHub username from shailygarg1992-svg to shailygarg1992
 
 ---
 
@@ -36,6 +39,8 @@
 - Installable as an app on iPhone (PWA)
 - Gmail integration — auto-syncs real Walmart order history from email (9 orders, ~30 items)
 - Order History screen — view all synced orders with items and prices
+- "Fill My Walmart Cart" button — sends restock list to Chrome Extension via Firebase
+- Chrome Extension — auto-adds items to Walmart cart with real-time progress updates
 
 ---
 

@@ -1,6 +1,6 @@
 # FridgeFill — Build Session Log
 
-**Date:** March 28 – April 2, 2026
+**Date:** March 28 – April 4, 2026
 
 ---
 
@@ -162,9 +162,13 @@ fridgefill/
 │   │   ├── HomeScreen.jsx         — Landing page + Gmail connection UI
 │   │   ├── CameraCapture.jsx      — Photo capture (camera + upload)
 │   │   ├── AnalyzingScreen.jsx    — Loading animation (also used for order syncing)
-│   │   ├── ResultsScreen.jsx      — Restock list + delivery optimizer
+│   │   ├── ResultsScreen.jsx      — Restock list + delivery optimizer + Fill Cart button
+│   │   ├── FillCartButton.jsx     — "Fill My Walmart Cart" with progress state machine
 │   │   ├── StaplesScreen.jsx      — View/toggle staple items
 │   │   └── OrderHistoryScreen.jsx — View synced Gmail orders
+│   ├── lib/
+│   │   ├── firebase.js            — Firebase init (Firestore + Auth)
+│   │   └── cartService.js         — Cart request send + watch functions
 │   ├── data/staples.js            — Hardcoded staples + order history (fallback)
 │   └── utils/api.js               — Image compression + API calls
 ├── public/
@@ -242,9 +246,53 @@ After building the Gmail integration, "Refresh Orders" returned zero orders ever
 
 5. **`export const config` vs `vercel.json`:** For Vercel serverless function settings, in-file exports are more reliable than vercel.json `functions` config.
 
+## "Fill My Walmart Cart" Feature (April 2, 2026)
+
+### What was added
+- **Firebase integration** — Firebase Firestore + Auth added to the PWA
+- **"Fill My Walmart Cart" button** — appears on Results screen, sends restock list to Firestore
+- **Chrome Extension** (`fridgefill-extension/`) — reads cart requests from Firestore, automates adding items to Walmart cart
+- **Real-time progress** — PWA watches Firestore for live updates as extension adds each item
+
+### How it works
+```
+1. User taps "Fill My Walmart Cart" on Results screen
+2. PWA signs user in via Google (Firebase Auth popup)
+3. PWA writes cart request to Firestore: { status: "pending", items: [...] }
+4. Chrome Extension detects new request via Firestore listener
+5. Extension tries Walmart API (autocomplete → add to cart)
+6. Falls back to DOM automation on walmart.com tab
+7. Updates Firestore with per-item status + progress
+8. PWA shows real-time progress bar and item-by-item status
+```
+
+### New files
+- `src/lib/firebase.js` — Firebase init (Firestore + Auth)
+- `src/lib/cartService.js` — `sendCartRequest()` + `watchCartRequest()`
+- `src/components/FillCartButton.jsx` — State machine button (idle → signing_in → sending → waiting → in_progress → completed/failed)
+- `fridgefill-extension/` — Full Chrome Extension (Manifest V3) with webpack build
+
+### Firebase setup
+- Project: `fridgefill-shopper`
+- Firestore security rules: users can only access their own `cart_requests` subcollection
+- Auth: Google Sign-In enabled
+- Chrome OAuth Client ID configured for extension
+
+### Requirements for use
+- Chrome Extension loaded and signed in
+- User logged into walmart.com in Chrome
+- Same Google account in both PWA and extension
+
+## GitHub Username Change (April 2, 2026)
+- Changed from `shailygarg1992-svg` to `shailygarg1992`
+- Updated git remote URL
+- Updated references in SESSION_LOG.md and SESSION_SUMMARY.md
+- GitHub redirects old username automatically, so Vercel deployment was unaffected
+
 ## Accounts & Config
 - **GitHub:** shailygarg1992
 - **Vercel:** shailygarg1992-3481 (email: shailygarg1992@gmail.com)
 - **Google Cloud:** project "FridgeFill" (testing mode, shailygarg1992@gmail.com as test user)
+- **Firebase:** project "fridgefill-shopper" (Firestore + Auth)
 - **Anthropic:** $5 prepaid credits (~500 scans)
 - **Estimated cost:** ~$0.50-1/month (Gmail parsing is now free — no Claude API calls)
