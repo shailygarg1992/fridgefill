@@ -75,6 +75,17 @@ export function getWalmartLink(searchQuery) {
   return `https://www.walmart.com/search?q=${searchQuery}`;
 }
 
+export async function searchWalmartProduct(query) {
+  try {
+    const res = await fetch(`/api/walmart-search?q=${encodeURIComponent(query)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.products?.[0] || null;
+  } catch {
+    return null;
+  }
+}
+
 export function daysSince(dateStr) {
   const then = new Date(dateStr);
   const now = new Date();

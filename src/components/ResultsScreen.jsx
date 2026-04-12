@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { FREE_DELIVERY_THRESHOLD, DELIVERY_FEE } from '../data/staples'
-import { getWalmartLink } from '../utils/api'
+import { getWalmartLink, searchWalmartProduct } from '../utils/api'
 import FillCartButton from './FillCartButton'
 
 // Get the per-unit price from an item, handling both old and new field names
@@ -37,7 +37,7 @@ function DeliveryProgressBar({ total, threshold }) {
   )
 }
 
-function ItemRow({ item, onToggle, included }) {
+function ItemRow({ item, onToggle, included, image, imageLoading }) {
   const walmartUrl = item.walmart_search?.startsWith('http')
     ? item.walmart_search
     : getWalmartLink(item.walmart_search || item.item)
@@ -47,7 +47,7 @@ function ItemRow({ item, onToggle, included }) {
   const lineTotal = unitPrice * qty
 
   return (
-    <div className={`flex items-center gap-3 py-2.5 border-b border-gray-100 last:border-0 transition-opacity ${included ? '' : 'opacity-30'}`}>
+    <div className={`flex items-center gap-3 py-3 border-b border-gray-100 last:border-0 transition-opacity ${included ? '' : 'opacity-30'}`}>
       <button onClick={onToggle} className="shrink-0">
         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${included ? 'bg-green-600 border-green-600' : 'border-gray-300'}`}>
           {included && (
@@ -57,6 +57,23 @@ function ItemRow({ item, onToggle, included }) {
           )}
         </div>
       </button>
+
+      {imageLoading ? (
+        <div className="shrink-0 w-10 h-10 rounded-lg bg-gray-100 animate-pulse" />
+      ) : image ? (
+        <img
+          src={image}
+          alt={item.item}
+          className="shrink-0 w-10 h-10 rounded-lg object-cover bg-gray-50"
+          onError={e => { e.target.style.display = 'none' }}
+        />
+      ) : (
+        <div className="shrink-0 w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+          <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+          </svg>
+        </div>
+      )}
 
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-900 truncate">{item.item}</p>
@@ -85,6 +102,21 @@ function ItemRow({ item, onToggle, included }) {
 
 export default function ResultsScreen({ results, onBack }) {
   const [dismissedIds, setDismissedIds] = useState(new Set())
+  const [images, setImages] = useState({})
+  const [imagesLoading, setImagesLoading] = useState({})
+
+  useEffect(() => {
+    const allItems = [...(results.restock_list || []), ...(results.free_delivery?.filler_suggestions || [])]
+    allItems.forEach(item => {
+      const key = item.item
+      if (images[key] !== undefined) return
+      setImagesLoading(prev => ({ ...prev, [key]: true }))
+      searchWalmartProduct(item.walmart_search || item.item).then(product => {
+        setImages(prev => ({ ...prev, [key]: product?.image || null }))
+        setImagesLoading(prev => ({ ...prev, [key]: false }))
+      })
+    })
+  }, [results])
 
   const toggleItem = (itemName) => {
     setDismissedIds((prev) => {
@@ -147,6 +179,8 @@ export default function ResultsScreen({ results, onBack }) {
                 item={item}
                 included={!dismissedIds.has(item.item)}
                 onToggle={() => toggleItem(item.item)}
+                image={images[item.item]}
+                imageLoading={imagesLoading[item.item]}
               />
             ))}
           </div>
@@ -167,7 +201,7 @@ export default function ResultsScreen({ results, onBack }) {
                 const unitPrice = getUnitPrice(item)
                 const qty = item.qty || 1
                 return (
-                  <div key={item.item} className={`flex items-center gap-3 py-2 border-b border-amber-100 last:border-0 transition-opacity ${included ? '' : 'opacity-30'}`}>
+                  <div key={item.item} className={`flex items-center gap-3 py-3 border-b border-amber-100 last:border-0 transition-opacity ${included ? '' : 'opacity-30'}`}>
                     <button onClick={() => toggleItem(item.item)} className="shrink-0">
                       <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${included ? 'bg-amber-500 border-amber-500' : 'border-gray-300'}`}>
                         {included && (
@@ -177,6 +211,22 @@ export default function ResultsScreen({ results, onBack }) {
                         )}
                       </div>
                     </button>
+                    {imagesLoading[item.item] ? (
+                      <div className="shrink-0 w-10 h-10 rounded-lg bg-amber-100 animate-pulse" />
+                    ) : images[item.item] ? (
+                      <img
+                        src={images[item.item]}
+                        alt={item.item}
+                        className="shrink-0 w-10 h-10 rounded-lg object-cover bg-amber-50"
+                        onError={e => { e.target.style.display = 'none' }}
+                      />
+                    ) : (
+                      <div className="shrink-0 w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                        </svg>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-900 truncate">{item.item}</p>
                       <p className="text-xs text-amber-700">{item.reason}</p>

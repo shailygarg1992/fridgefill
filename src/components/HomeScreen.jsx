@@ -1,5 +1,5 @@
 export default function HomeScreen({
-  onScan, onStaples, onOrders, onConnectGmail, onDisconnectGmail, onSyncOrders,
+  onScan, onQuickAdd, onStaples, onOrders, onConnectGmail, onDisconnectGmail, onSyncOrders,
   gmailConnected, orderCount, lastScanDate,
 }) {
   const formatLastScan = () => {
@@ -49,6 +49,13 @@ export default function HomeScreen({
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
           </svg>
           Scan My Fridge
+        </button>
+
+        <button onClick={onQuickAdd} className="btn-secondary flex items-center justify-center gap-3">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+          </svg>
+          Quick Add — Voice or Search
         </button>
 
         {/* Gmail Connection */}

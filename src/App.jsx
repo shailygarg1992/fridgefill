@@ -5,6 +5,7 @@ import AnalyzingScreen from './components/AnalyzingScreen'
 import ResultsScreen from './components/ResultsScreen'
 import StaplesScreen from './components/StaplesScreen'
 import OrderHistoryScreen from './components/OrderHistoryScreen'
+import QuickAddScreen from './components/QuickAddScreen'
 import { analyzeFridge, imageToBase64 } from './utils/api'
 
 export default function App() {
@@ -128,6 +129,7 @@ export default function App() {
       {screen === 'home' && (
         <HomeScreen
           onScan={() => setScreen('camera')}
+          onQuickAdd={() => setScreen('quickadd')}
           onStaples={() => setScreen('staples')}
           onOrders={() => setScreen('orders')}
           onConnectGmail={handleConnectGmail}
@@ -157,6 +159,9 @@ export default function App() {
       )}
       {screen === 'staples' && (
         <StaplesScreen onBack={() => setScreen('home')} />
+      )}
+      {screen === 'quickadd' && (
+        <QuickAddScreen onBack={() => setScreen('home')} />
       )}
       {screen === 'orders' && (
         <OrderHistoryScreen
